@@ -117,11 +117,6 @@ int main()
         }
     }
     Mix_FreeMusic(music);
-    /*
-    for (int i = 0; i < 300; i++) {
-        cout << i << " " << (char)i << endl;
-    }
-    */
 }
 
 void up() {
@@ -214,7 +209,7 @@ void init_aims() {
     main_door_x = x;
     main_door_y = y;
     matrix[y][x] = AIM;
-    for (int i = 1; i < level * 3; i++) {
+    for (int i = 1; i < level * 7; i++) {
         x = distrX(gen);
         int y = distrY(gen);
         matrix[y][x] = AIM;
