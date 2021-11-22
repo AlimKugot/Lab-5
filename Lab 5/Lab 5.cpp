@@ -242,7 +242,7 @@ void draw() {
         cout << endl;
     }
 
-    cout << "\n\n\n";
+    cout << "\n\n";
     cout << (char) 24 << " \t " << "up" << endl;
     cout << (char) 26 << " \t " << "right" << endl;
     cout << (char) 25 << " \t " << "down" << endl;
@@ -251,6 +251,15 @@ void draw() {
     cout << "Esc \t exit" << endl;
     cout << "R \t reload hero position (minus life)" << endl;
     cout << "Space \t plant bomb" << endl;
+
+    cout << "\n\n";
+
+
+    cout << "--------------------------------" << endl;
+    cout << "you're a hero " << (char)HERO << endl;
+    cout << "you can destroy walls " << (char)AIM << " via bombs " << char(BOMB) << endl;
+    cout << "walls can hold key to the next level - " << (char)DONE << endl;
+    cout << "--------------------------------" << endl;
 }
 
 void decrease_bomb_time() {
