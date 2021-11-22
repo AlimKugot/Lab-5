@@ -1,10 +1,16 @@
 ﻿#include <iostream>
-#include <queue>
+#include "SDL.h"
+#include "SDL_mixer.h"
 #include <sstream>
 #include <chrono>
 #include <thread>
 #include <conio.h>
 #include <random>
+
+#define MUSIC_PATH "hotline_miami.mp3"
+#define SOUND_WIN "win.wav"
+#define SOUND_BOOM "small-explosion.wav"
+#define SOUND_DEAD "dead.wav"
 
 using namespace std;
 
@@ -42,6 +48,7 @@ void lose();
 #define MAX_Y 10
 char matrix[MAX_Y][MAX_X];
 
+// level info 
 int lives = 3;
 int level = 1;
 
@@ -53,46 +60,68 @@ int main_door_y = -1;
 int star_x = 5 - 1;
 int star_y = 5 - 1;
 
-
+#undef main
 int main()
 {
+    int result = 0;
+    int flags = MIX_INIT_MP3;
+
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        printf("Failed to init SDL\n");
+        exit(1);
+    }
+
+    if (flags != (result = Mix_Init(flags))) {
+        printf("Could not initialize mixer (result: %d).\n", result);
+        printf("Mix_Init: %s\n", Mix_GetError());
+        exit(1);
+    }
+
+    Mix_OpenAudio(22050, AUDIO_S16SYS, 2, 640);
+    Mix_Music* music = Mix_LoadMUS(MUSIC_PATH);
+    Mix_PlayMusic(music, 1);
+
+    while (!SDL_QuitRequested()) {
+        SDL_Delay(250);
+        init();
+        draw();
+        while (1) {
+            char input = _getch();
+            if (_kbhit() && input == -32) {
+                input = _getch();
+            }
+            switch (input) {
+            case 82: // R
+            case 114: // r
+                reload();
+                break;
+            case 32: // space
+                plant_bomb();
+                break;
+            case 72:
+                up();
+                break;
+            case 75:
+                left();
+                break;
+            case 77:
+                right();
+                break;
+            case 80:
+                down();
+                break;
+            case 27: // esc
+                SDL_Quit();
+                return(0);
+            }
+        }
+    }
+    Mix_FreeMusic(music);
     /*
     for (int i = 0; i < 300; i++) {
         cout << i << " " << (char)i << endl;
     }
     */
-
-    init();
-    draw();
-    while (1) {
-        char input = _getch();
-        if (_kbhit() && input == -32) {
-           input = _getch();
-        }
-        switch (input) {
-        case 82: // R
-        case 114: // r
-            reload();
-            break;
-        case 32: // space
-            plant_bomb();
-            break;
-        case 72:
-            up();
-            break;
-        case 75:
-            left();
-            break;
-        case 77:
-            right();
-            break;
-        case 80:
-            down();
-            break;
-        case 27: // esc
-            return(0);
-        }
-    }
 }
 
 void up() {
@@ -106,18 +135,24 @@ void up() {
         matrix[star_y][star_x] = HERO;
         draw();
     }
+    else if (ch == (char) DONE) {
+        win();
+    }
 }
 
 void down() {
     char ch = matrix[star_y + 1][star_x];
     if (ch == '.') {
-        if (matrix[star_y][star_x] != (char) BOMB) {
+        if (matrix[star_y][star_x] != (char)BOMB) {
             matrix[star_y][star_x] = '.';
         }
         decrease_bomb_time();
         star_y++;
         matrix[star_y][star_x] = HERO;
         draw();
+    }
+    else if (ch == (char) DONE) {
+        win();
     }
 }
 
@@ -132,6 +167,9 @@ void left() {
         matrix[star_y][star_x] = HERO;
         draw();
     }
+    else if (ch == (char) DONE) {
+        win();
+    }
 }
 
 void right() {
@@ -144,6 +182,9 @@ void right() {
         star_x++;
         matrix[star_y][star_x] = HERO;
         draw();
+    }
+    else if (ch == (char) DONE) {
+        win();
     }
 }
 
@@ -168,18 +209,23 @@ void init_aims() {
     std::uniform_int_distribution<> distrX(2, MAX_X - 2); // define the range
     std::uniform_int_distribution<> distrY(2, MAX_Y - 2); // define the range
 
-    for (int i = 0; i < 40; i++) {
-        const int x = distrX(gen);
-        const int y = distrY(gen);
-        if (i == 20) {
-            main_door_x = x;
-            main_door_y = y;
-        }
+    int x = distrX(gen);
+    int y = distrY(gen);
+    main_door_x = x;
+    main_door_y = y;
+    matrix[y][x] = AIM;
+    for (int i = 1; i < level * 3; i++) {
+        x = distrX(gen);
+        int y = distrY(gen);
         matrix[y][x] = AIM;
     }
 }
 
 void init() {
+    if (lives <= 0) {
+        level = 1;
+        lives = 3;
+    }
     for (int i = 0; i < MAX_Y; i++) {
         for (int j = 0; j < MAX_X; j++) {
            matrix[i][j] = '.';
@@ -230,7 +276,12 @@ void check_to_blow_up(int x, int y) {
         blow_up(x, y);
     }
     else if (ch == (char) AIM) {
-        matrix[y][x] = BOMB;
+        if (x == main_door_x && y == main_door_y) {
+            matrix[y][x] = DONE;
+        }
+        else {
+            matrix[y][x] = BOMB;
+        }
     }
     else if (ch == HERO) {
         lives--;
@@ -239,17 +290,20 @@ void check_to_blow_up(int x, int y) {
 }
 
 void blow_up(int x, int y) {
-    for (auto& bomb : bombs) {
-        if (bomb.x = x && bomb.y == y) {
-            blow_up(bomb);
-        }
-    }
+    matrix[y][x] = BOMB;
+    Bomb bomb;
+    bomb.x = x;
+    bomb.y = y;
+    bombs.push_back(bomb);
+    blow_up(bomb);
 }
 
 void blow_up(Bomb bomb) {
     int x = bomb.x;
     int y = bomb.y;
     matrix[y][x] = BOOM;
+
+    //todo: check here to don't blow up
     for (int i = 0; i < 2; i++) {
         if (x - i > 0) check_to_blow_up(x - i, y);
         if (x + i < MAX_X - 1) check_to_blow_up(x + i, y);
@@ -257,7 +311,6 @@ void blow_up(Bomb bomb) {
         if (y + i < MAX_Y - 1) check_to_blow_up(x, y + i);
     }
 }
-
 
 
 void plant_bomb() {
@@ -294,12 +347,29 @@ void reload() {
 
 void win() {
     system("cls");
-    cout << "You win! :)" << endl;
-    exit(0);
+    if (level == 10) {
+        cout << "You win! :)" << endl;
+        exit(0);
+    }
+    else {
+        cout << "Next level -_-" << endl;
+        lives = 3;
+        level++;
+        main();
+    }
 }
 
 void lose() {
     system("cls");
     cout << "You lose! :(" << endl;
-    exit(0);
+    cout << "\n\n\n";
+    cout << "Do you want again? [yes - 1|no = 0]: ";
+    char ch;
+    cin >> ch;
+    if (ch == '1') {
+        main();
+    }
+    else {
+        exit(0);
+    }
 }
